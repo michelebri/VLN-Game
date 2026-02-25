@@ -95,6 +95,10 @@ class VLObjectNavEpisode(NavigationEpisode):
     """
     instruction_text: str
     object_category: Optional[str] = None
+    scene_dataset_config: Optional[str] = None
+    additional_obj_config_paths: Optional[list] = None
+    info: Optional[dict] = None
+    start_room: Optional[str] = None
 
 @registry.register_sensor(name="InstructionSensor")
 class InstructionSensor(Sensor):

@@ -20,6 +20,7 @@ import open3d.visualization.gui as gui
 import sys
 sys.path.append(".")
 import time
+import csv
 
 from habitat import Env, logger
 from arguments import get_args
@@ -55,7 +56,6 @@ def main(args, send_queue, receive_queue):
         filename=log_dir + "eval.log",
         level=logging.INFO)
 
-    args.task_config = "vlobjectnav_hm3d.yaml"
     config = get_config(config_paths=["configs/"+ args.task_config])
 
     logging.info(args)
@@ -94,7 +94,14 @@ def main(args, send_queue, receive_queue):
 
     count_episodes = 0
     start = time.time()
-    
+
+    # CSV results per episode
+    results_csv = os.path.join(log_dir, "results.csv")
+    csv_file = open(results_csv, "w", newline="")
+    csv_writer = csv.writer(csv_file)
+    csv_writer.writerow(["episode_id", "scene", "instruction", "object_category",
+                         "steps", "distance_to_goal", "success", "spl", "fail_reason"])
+
     while count_episodes < num_episodes:
         obs = env.reset()
         
@@ -111,12 +118,13 @@ def main(args, send_queue, receive_queue):
         count_steps = 0
         start_ep = time.time()
         while not env.episode_over:
-            
-            if count_episodes < 253:
+            #TODO:MICHELE verifica
+            print("MICHELE PRINT", count_episodes)
+            """if count_episodes < 253:
                 action = 0
-            else:
-                agent_state = env.sim.get_agent_state()
-                action = agent.act(obs, agent_state, send_queue, receive_queue)
+            else:"""
+            agent_state = env.sim.get_agent_state()
+            action = agent.act(obs, agent_state, send_queue, receive_queue)
 
             if action == None:
                 continue
@@ -181,8 +189,34 @@ def main(args, send_queue, receive_queue):
         print(log)
         logging.info(log)
 
+        # Write per-episode result to CSV
+        episode = env.current_episode
+        scene_name = episode.scene_id.split("/")[-2] if "/" in episode.scene_id else episode.scene_id
+        instruction = episode.instruction_text if hasattr(episode, 'instruction_text') else ""
+        obj_cat = episode.goals[0].object_category if episode.goals else ""
+        if action == 0 and metrics.get("spl", 0):
+            fail_reason = "success"
+        elif count_steps >= config.ENVIRONMENT.MAX_EPISODE_STEPS - 1:
+            fail_reason = "exploration"
+        elif agent.replan_count > 20:
+            fail_reason = "collision"
+        else:
+            fail_reason = "detection"
+        csv_writer.writerow([
+            count_episodes - 1, scene_name, instruction, obj_cat,
+            count_steps,
+            round(metrics.get("distance_to_goal", -1), 3),
+            round(metrics.get("success", 0), 3),
+            round(metrics.get("spl", 0), 3),
+            fail_reason,
+        ])
+        csv_file.flush()
+
 
         
+
+    csv_file.close()
+    print(f"\nResults saved to {results_csv}")
 
     avg_metrics = {k: v / count_episodes for k, v in agg_metrics.items()}
 
