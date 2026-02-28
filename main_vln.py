@@ -103,7 +103,7 @@ def main(args, send_queue, receive_queue):
     csv_file = open(results_csv, "w", newline="")
     csv_writer = csv.writer(csv_file)
     csv_writer.writerow(["episode_id", "scene", "instruction", "object_category",
-                         "steps", "distance_to_goal", "success", "spl", "fail_reason", "time_s"])
+                         "steps", "distance_to_goal", "euclidean_distance", "success", "spl", "fail_reason", "time_s"])
 
     while count_episodes < num_episodes:
         obs = env.reset()
@@ -205,10 +205,14 @@ def main(args, send_queue, receive_queue):
         else:
             fail_reason = "detection"
         episode_time = round(end - start_ep, 2)
+        agent_pos = np.array(env.sim.get_agent_state().position)
+        goal_pos = np.array(episode.goals[0].position)
+        euclidean_dist = round(float(np.linalg.norm(agent_pos - goal_pos)), 3)
         csv_writer.writerow([
             count_episodes - 1, scene_name, instruction, obj_cat,
             count_steps,
             round(metrics.get("distance_to_goal", -1), 3),
+            euclidean_dist,
             round(metrics.get("success", 0), 3),
             round(metrics.get("spl", 0), 3),
             fail_reason,
