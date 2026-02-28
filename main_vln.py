@@ -42,10 +42,13 @@ def transform_rgb_bgr(image):
 
 # def generate_point_cloud(window):
 def main(args, send_queue, receive_queue):
+    timestamp = time.strftime("%Y%m%d_%H%M%S")
     args.exp_name = "vlobjectnav-"+ args.vln_mode# + "-mini"
-    
+
     if args.gpt_type == 3:
         args.exp_name += "-mini"
+
+    args.exp_name += f"-{timestamp}"
 
     log_dir = "{}/logs/{}/".format(args.dump_location, args.exp_name)
 
@@ -100,7 +103,7 @@ def main(args, send_queue, receive_queue):
     csv_file = open(results_csv, "w", newline="")
     csv_writer = csv.writer(csv_file)
     csv_writer.writerow(["episode_id", "scene", "instruction", "object_category",
-                         "steps", "distance_to_goal", "success", "spl", "fail_reason"])
+                         "steps", "distance_to_goal", "success", "spl", "fail_reason", "time_s"])
 
     while count_episodes < num_episodes:
         obs = env.reset()
@@ -119,12 +122,11 @@ def main(args, send_queue, receive_queue):
         start_ep = time.time()
         while not env.episode_over:
             #TODO:MICHELE verifica
-            print("MICHELE PRINT", count_episodes)
-            """if count_episodes < 253:
+            if count_episodes > 100:
                 action = 0
-            else:"""
-            agent_state = env.sim.get_agent_state()
-            action = agent.act(obs, agent_state, send_queue, receive_queue)
+            else:
+                agent_state = env.sim.get_agent_state()
+                action = agent.act(obs, agent_state, send_queue, receive_queue)
 
             if action == None:
                 continue
@@ -202,6 +204,7 @@ def main(args, send_queue, receive_queue):
             fail_reason = "collision"
         else:
             fail_reason = "detection"
+        episode_time = round(end - start_ep, 2)
         csv_writer.writerow([
             count_episodes - 1, scene_name, instruction, obj_cat,
             count_steps,
@@ -209,6 +212,7 @@ def main(args, send_queue, receive_queue):
             round(metrics.get("success", 0), 3),
             round(metrics.get("spl", 0), 3),
             fail_reason,
+            episode_time,
         ])
         csv_file.flush()
 
