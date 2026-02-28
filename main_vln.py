@@ -122,7 +122,7 @@ def main(args, send_queue, receive_queue):
         start_ep = time.time()
         while not env.episode_over:
             #TODO:MICHELE verifica
-            if count_episodes > 100:
+            if count_episodes < 100:
                 action = 0
             else:
                 agent_state = env.sim.get_agent_state()
