@@ -25,6 +25,7 @@ from multiprocessing import Process, Queue
 import sys
 sys.path.append(".")
 import time
+import csv
 
 from utils.shortest_path_follower import ShortestPathFollowerCompat
 from utils.task import PreciseTurn
@@ -45,7 +46,8 @@ def transform_rgb_bgr(image):
 # def generate_point_cloud(window):
 def main(args, send_queue, receive_queue):
     
-    args.exp_name = "objectnav-"+ args.detector
+    timestamp = time.strftime("%Y%m%d_%H%M%S")
+    args.exp_name = "objectnav-" + args.detector + f"-{timestamp}"
 
     log_dir = "{}/logs/{}/".format(args.dump_location, args.exp_name)
 
@@ -96,7 +98,14 @@ def main(args, send_queue, receive_queue):
     count_episodes = 0
     # for count_episodes in trange(num_episodes):
     start = time.time()
-    
+
+    # CSV results per episode
+    results_csv = os.path.join(log_dir, "results.csv")
+    csv_file = open(results_csv, "w", newline="")
+    csv_writer = csv.writer(csv_file)
+    csv_writer.writerow(["episode_id", "scene", "object_category",
+                         "steps", "distance_to_goal", "euclidean_distance", "success", "spl", "fail_reason", "time_s"])
+
     while count_episodes < num_episodes:
         obs = env.reset()
         
@@ -119,7 +128,7 @@ def main(args, send_queue, receive_queue):
 
             # dd_s_time = time.time()
   
-            if count_episodes < 5:
+            if count_episodes > 40:
                 action = 0
             else:
                 agent_state = env.sim.get_agent_state()
@@ -184,11 +193,40 @@ def main(args, send_queue, receive_queue):
         print(log)
         logging.info(log)
 
+        # Write per-episode result to CSV
+        episode = env.current_episode
+        scene_name = episode.scene_id.split("/")[-2] if "/" in episode.scene_id else episode.scene_id
+        obj_cat = episode.object_category if hasattr(episode, 'object_category') else ""
+        if action == 0 and metrics.get("spl", 0):
+            fail_reason = "success"
+        elif count_steps >= config.ENVIRONMENT.MAX_EPISODE_STEPS - 1:
+            fail_reason = "exploration"
+        elif agent.replan_count > 20:
+            fail_reason = "collision"
+        else:
+            fail_reason = "detection"
+        episode_time = round(end - start_ep, 2)
+        agent_pos = np.array(env.sim.get_agent_state().position)
+        goal_pos = np.array(episode.goals[0].position)
+        euclidean_dist = round(float(np.linalg.norm(agent_pos - goal_pos)), 3)
+        csv_writer.writerow([
+            count_episodes - 1, scene_name, obj_cat,
+            count_steps,
+            round(metrics.get("distance_to_goal", -1), 3),
+            euclidean_dist,
+            round(metrics.get("success", 0), 3),
+            round(metrics.get("spl", 0), 3),
+            fail_reason,
+            episode_time,
+        ])
+        csv_file.flush()
+
         if args.save_video:
             imageio.mimsave(video_save_path, frames, fps=2)
             print(f"Video saved to {video_save_path}")
-     
-        
+
+    csv_file.close()
+    print(f"\nResults saved to {results_csv}")
 
     avg_metrics = {k: v / count_episodes for k, v in agg_metrics.items()}
 
