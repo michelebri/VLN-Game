@@ -41,6 +41,8 @@ def get_args():
                         default="objectnav_hm3d.yaml",
                         help="path to config yaml containing task information")
     parser.add_argument('--episode_count', type=int, default=-1)
+    parser.add_argument('--skip_scenes', type=str, default="",
+                        help='comma-separated list of scene IDs to skip (e.g. 00827-BAbdmeyTvMZ,00829-QaLdnwvtxbs)')
 
     # Model Hyperparameters
     parser.add_argument('--turn_angle', type=int, default=30)

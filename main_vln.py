@@ -105,24 +105,30 @@ def main(args, send_queue, receive_queue):
     csv_writer.writerow(["episode_id", "scene", "instruction", "object_category",
                          "steps", "distance_to_goal", "euclidean_distance", "success", "spl", "fail_reason", "time_s"])
 
+    skip_scenes = set(args.skip_scenes.split(",")) if args.skip_scenes else set()
+
     while count_episodes < num_episodes:
         obs = env.reset()
-        
+
+        episode = env.current_episode
+        scene_name = episode.scene_id.split("/")[-2] if "/" in episode.scene_id else episode.scene_id
+        if scene_name in skip_scenes:
+            count_episodes += 1
+            continue
+
         agent.reset()
         print("Instrcution: ", obs["instruction"]['text'])
 
         image = transform_rgb_bgr(obs["rgb"])  # 224*224*3
-        image_rgb = cv2.cvtColor(obs["rgb"], cv2.COLOR_BGR2RGB) 
+        image_rgb = cv2.cvtColor(obs["rgb"], cv2.COLOR_BGR2RGB)
         # cv2.imshow("RGB0", obs["rgb"])
 
-        
         logging.info(obs["instruction"]['text'])
 
         count_steps = 0
         start_ep = time.time()
         while not env.episode_over:
-            #TODO:MICHELE verifica
-            if count_episodes < 100:
+            if count_episodes < 1:
                 action = 0
             else:
                 agent_state = env.sim.get_agent_state()
